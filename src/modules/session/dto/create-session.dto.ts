@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, MaxLength, MinLength, Matches, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  MaxLength,
+  MinLength,
+  Matches,
+  IsIn,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateSessionDto {
   @ApiProperty({
@@ -41,4 +49,25 @@ export class CreateSessionDto {
   @IsOptional()
   @IsIn(['http', 'https', 'socks4', 'socks5'])
   proxyType?: 'http' | 'https' | 'socks4' | 'socks5';
+
+  @ApiPropertyOptional({
+    description: 'Link method: QR scan (default) or pairing code via phone number',
+    enum: ['qr', 'pairing'],
+    default: 'qr',
+  })
+  @IsOptional()
+  @IsIn(['qr', 'pairing'])
+  linkMethod?: 'qr' | 'pairing';
+
+  @ApiPropertyOptional({
+    description:
+      'Phone number for pairing code linking (international format, digits only). Required when linkMethod is pairing.',
+    example: '628123456789',
+  })
+  @ValidateIf(o => o.linkMethod === 'pairing')
+  @IsString()
+  @Matches(/^[0-9]{8,15}$/, {
+    message: 'Phone number must be 8-15 digits in international format (no + or spaces)',
+  })
+  phoneNumber?: string;
 }

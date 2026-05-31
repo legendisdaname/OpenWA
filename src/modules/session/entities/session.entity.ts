@@ -6,6 +6,7 @@ export enum SessionStatus {
   CREATED = 'created',
   INITIALIZING = 'initializing',
   QR_READY = 'qr_ready',
+  PAIRING_CODE_READY = 'pairing_code_ready',
   AUTHENTICATING = 'authenticating',
   READY = 'ready',
   DISCONNECTED = 'disconnected',

@@ -63,6 +63,7 @@ describe('SessionService', () => {
       destroy: jest.fn().mockResolvedValue(undefined),
       disconnect: jest.fn().mockResolvedValue(undefined),
       getQRCode: jest.fn().mockReturnValue(null),
+      getPairingCode: jest.fn().mockReturnValue(null),
       getGroups: jest.fn().mockResolvedValue([]),
     };
 

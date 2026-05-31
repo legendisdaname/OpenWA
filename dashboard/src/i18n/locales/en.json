@@ -111,12 +111,13 @@
     "initializing": "Starting...",
     "connecting": "Connecting...",
     "qr_ready": "Scan QR",
+    "pairing_code_ready": "Enter code",
     "ready": "Connected",
     "disconnected": "Disconnected"
   },
   "sessions": {
     "title": "Sessions",
-    "subtitle": "Manage your WhatsApp sessions and QR code connections",
+    "subtitle": "Manage your WhatsApp sessions (QR scan or phone pairing code)",
     "newSession": "New Session",
     "searchPlaceholder": "Search sessions...",
     "filter": {
@@ -140,7 +141,13 @@
       "successTitle": "Session Created",
       "successDesc": "Session \"{{name}}\" created successfully",
       "errorTitle": "Create Failed",
-      "errorDefault": "Failed to create session"
+      "errorDefault": "Failed to create session",
+      "linkMethod": "Connection method",
+      "linkQr": "QR code (scan with phone)",
+      "linkPairing": "Pairing code (link with phone number)",
+      "phoneLabel": "Your WhatsApp phone number",
+      "phonePlaceholder": "e.g. 628123456789",
+      "phoneHint": "International format, digits only (no + or spaces). Example: country code + number."
     },
     "delete": {
       "title": "Confirm Delete",
@@ -164,6 +171,21 @@
       "showQr": "Show QR",
       "loading": "Loading...",
       "scanToConnect": "Scan QR code to connect"
+    },
+    "pairing": {
+      "title": "Link with phone number",
+      "forPhone": "For number: {{phone}}",
+      "step1": "<strong>1.</strong> Open WhatsApp on your phone",
+      "step2": "<strong>2.</strong> Tap <strong>Menu</strong> → <strong>Linked Devices</strong>",
+      "step3": "<strong>3.</strong> Tap <strong>Link with phone number instead</strong>",
+      "step4": "<strong>4.</strong> Enter this code on your phone:",
+      "autoRefresh": "Code refreshes automatically every 3 minutes",
+      "generating": "Generating pairing code...",
+      "unavailable": "Pairing code not available yet. Try again in a moment.",
+      "preparing": "Preparing pairing code...",
+      "showCode": "Show code",
+      "loading": "Loading...",
+      "enterToConnect": "Enter pairing code on your phone"
     },
     "details": {
       "title": "Session Details",

@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
-import { Plus, QrCode, RefreshCw, Trash2, Eye, Loader2, Play, Square, X, Search, Filter } from 'lucide-react';
+import {
+  Plus,
+  QrCode,
+  Smartphone,
+  RefreshCw,
+  Trash2,
+  Eye,
+  Loader2,
+  Play,
+  Square,
+  X,
+  Search,
+  Filter,
+} from 'lucide-react';
 import { sessionApi, type Session } from '../services/api';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useToast } from '../components/Toast';
@@ -19,8 +32,16 @@ export function Sessions() {
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
+  const [newLinkMethod, setNewLinkMethod] = useState<'qr' | 'pairing'>('qr');
+  const [newSessionPhone, setNewSessionPhone] = useState('');
   const [creating, setCreating] = useState(false);
   const [qrData, setQrData] = useState<{ sessionId: string; sessionName: string; qrCode: string } | null>(null);
+  const [pairingData, setPairingData] = useState<{
+    sessionId: string;
+    sessionName: string;
+    pairingCode: string;
+    phoneNumber: string;
+  } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
@@ -78,6 +99,29 @@ export function Sessions() {
     }
   }, []);
 
+  const pairingRefreshInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchPairingCode = useCallback(async (sessionId: string) => {
+    try {
+      const result = await sessionApi.getPairingCode(sessionId);
+      setPairingData({
+        sessionId,
+        sessionName: currentSessionName.current,
+        pairingCode: result.pairingCode,
+        phoneNumber: result.phoneNumber,
+      });
+      if (result.status === 'ready') {
+        setPairingData(null);
+        currentSessionName.current = '';
+        fetchSessions();
+      }
+    } catch {
+      setPairingData(null);
+      currentSessionName.current = '';
+      fetchSessions();
+    }
+  }, []);
+
   useEffect(() => {
     if (qrData) {
       currentSessionName.current = qrData.sessionName;
@@ -90,13 +134,32 @@ export function Sessions() {
     };
   }, [qrData, fetchQR]);
 
+  useEffect(() => {
+    if (pairingData) {
+      currentSessionName.current = pairingData.sessionName;
+      pairingRefreshInterval.current = setInterval(() => {
+        fetchPairingCode(pairingData.sessionId);
+      }, 5000);
+    }
+    return () => {
+      if (pairingRefreshInterval.current) clearInterval(pairingRefreshInterval.current);
+    };
+  }, [pairingData, fetchPairingCode]);
+
   const handleCreate = async () => {
     if (!newSessionName.trim()) return;
+    if (newLinkMethod === 'pairing' && !/^[0-9]{8,15}$/.test(newSessionPhone.replace(/\D/g, ''))) return;
     try {
       setCreating(true);
-      const newSession = await sessionApi.create(newSessionName);
+      const phoneDigits = newSessionPhone.replace(/\D/g, '');
+      const newSession = await sessionApi.create(newSessionName, {
+        linkMethod: newLinkMethod,
+        ...(newLinkMethod === 'pairing' ? { phoneNumber: phoneDigits } : {}),
+      });
       setSessions([...sessions, newSession]);
       setNewSessionName('');
+      setNewSessionPhone('');
+      setNewLinkMethod('qr');
       setShowCreateModal(false);
       toast.success(t('sessions.create.successTitle'), t('sessions.create.successDesc', { name: newSession.name }));
     } catch (err) {
@@ -126,30 +189,19 @@ export function Sessions() {
     }
   };
 
-  const handleStart = async (id: string) => {
-    const session = sessions.find(s => s.id === id);
-    if (session && ['initializing', 'connecting', 'qr_ready'].includes(session.status)) {
-      handleShowQR(id);
-      return;
-    }
+  const isConnecting = (status: string) =>
+    ['initializing', 'connecting', 'qr_ready', 'pairing_code_ready'].includes(status);
 
-    try {
-      await sessionApi.start(id);
-      setSessions(sessions.map(s => (s.id === id ? { ...s, status: 'connecting' } : s)));
-      await fetchSessions();
-      handleShowQR(id);
-    } catch (err) {
-      console.error('Failed to start:', err);
-      await fetchSessions();
-      if (err instanceof Error && err.message.includes('already started')) {
-        handleShowQR(id);
-      }
-    }
-  };
-
-  const handleShowQR = async (id: string) => {
+  const handleShowConnect = async (id: string) => {
     const session = sessions.find(s => s.id === id);
     const sessionName = session?.name || '';
+    currentSessionName.current = sessionName;
+    if (session?.linkMethod === 'pairing') {
+      setQrData(null);
+      await fetchPairingCode(id);
+      return;
+    }
+    setPairingData(null);
     try {
       const qr = await sessionApi.getQR(id);
       setQrData({ sessionId: id, sessionName, qrCode: qr.qrCode });
@@ -159,11 +211,33 @@ export function Sessions() {
     }
   };
 
+  const handleStart = async (id: string) => {
+    const session = sessions.find(s => s.id === id);
+    if (session && isConnecting(session.status)) {
+      handleShowConnect(id);
+      return;
+    }
+
+    try {
+      await sessionApi.start(id);
+      setSessions(sessions.map(s => (s.id === id ? { ...s, status: 'connecting' } : s)));
+      await fetchSessions();
+      handleShowConnect(id);
+    } catch (err) {
+      console.error('Failed to start:', err);
+      await fetchSessions();
+      if (err instanceof Error && err.message.includes('already started')) {
+        handleShowConnect(id);
+      }
+    }
+  };
+
   const handleStop = async (id: string) => {
     try {
       await sessionApi.stop(id);
       setSessions(sessions.map(s => (s.id === id ? { ...s, status: 'disconnected' } : s)));
       if (qrData?.sessionId === id) setQrData(null);
+      if (pairingData?.sessionId === id) setPairingData(null);
     } catch (err) {
       console.error('Failed to stop:', err);
       fetchSessions();
@@ -188,7 +262,7 @@ export function Sessions() {
       statusFilter === 'all' ||
       (statusFilter === 'active' && s.status === 'ready') ||
       (statusFilter === 'inactive' && ['created', 'idle', 'disconnected'].includes(s.status)) ||
-      (statusFilter === 'connecting' && ['initializing', 'connecting', 'qr_ready'].includes(s.status));
+      (statusFilter === 'connecting' && isConnecting(s.status));
     return matchesSearch && matchesStatus;
   });
 
@@ -290,6 +364,46 @@ export function Sessions() {
                 sessions.some(s => s.name === newSessionName) && (
                   <p className="input-error">{t('sessions.create.duplicate')}</p>
                 )}
+
+              <label style={{ marginTop: '1rem' }}>{t('sessions.create.linkMethod')}</label>
+              <div className="link-method-options">
+                <label className="link-method-option">
+                  <input
+                    type="radio"
+                    name="linkMethod"
+                    checked={newLinkMethod === 'qr'}
+                    onChange={() => setNewLinkMethod('qr')}
+                  />
+                  <QrCode size={18} />
+                  <span>{t('sessions.create.linkQr')}</span>
+                </label>
+                <label className="link-method-option">
+                  <input
+                    type="radio"
+                    name="linkMethod"
+                    checked={newLinkMethod === 'pairing'}
+                    onChange={() => setNewLinkMethod('pairing')}
+                  />
+                  <Smartphone size={18} />
+                  <span>{t('sessions.create.linkPairing')}</span>
+                </label>
+              </div>
+
+              {newLinkMethod === 'pairing' && (
+                <>
+                  <label style={{ marginTop: '0.75rem' }}>{t('sessions.create.phoneLabel')}</label>
+                  <input
+                    type="tel"
+                    placeholder={t('sessions.create.phonePlaceholder')}
+                    value={newSessionPhone}
+                    onChange={e => setNewSessionPhone(e.target.value.replace(/[^\d+]/g, ''))}
+                  />
+                  <p className="input-hint">{t('sessions.create.phoneHint')}</p>
+                  {newSessionPhone && !/^[0-9]{8,15}$/.test(newSessionPhone.replace(/\D/g, '')) && (
+                    <p className="input-error">{t('sessions.create.phoneHint')}</p>
+                  )}
+                </>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowCreateModal(false)}>
@@ -303,11 +417,61 @@ export function Sessions() {
                   !newSessionName.trim() ||
                   !/^[a-z0-9-]+$/.test(newSessionName) ||
                   newSessionName.length > 50 ||
-                  sessions.some(s => s.name === newSessionName)
+                  sessions.some(s => s.name === newSessionName) ||
+                  (newLinkMethod === 'pairing' &&
+                    !/^[0-9]{8,15}$/.test(newSessionPhone.replace(/\D/g, '')))
                 }
               >
                 {creating ? <Loader2 className="animate-spin" size={16} /> : t('common.create')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pairingData && (
+        <div className="modal-overlay" onClick={() => setPairingData(null)}>
+          <div className="modal qr-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">
+                <h2>{t('sessions.pairing.title')}</h2>
+                <span className="session-name">{pairingData.sessionName}</span>
+              </div>
+              <button className="btn-close" onClick={() => setPairingData(null)} aria-label={t('common.close')}>
+                <X size={20} color="#64748b" />
+              </button>
+            </div>
+            <div className="modal-body" style={{ textAlign: 'center' }}>
+              {pairingData.pairingCode ? (
+                <>
+                  <p className="pairing-phone-label">
+                    {t('sessions.pairing.forPhone', { phone: pairingData.phoneNumber })}
+                  </p>
+                  <div className="pairing-code-display">{pairingData.pairingCode}</div>
+                  <div className="qr-instructions">
+                    <p className="qr-step">
+                      <Trans i18nKey="sessions.pairing.step1" components={{ strong: <strong /> }} />
+                    </p>
+                    <p className="qr-step">
+                      <Trans i18nKey="sessions.pairing.step2" components={{ strong: <strong /> }} />
+                    </p>
+                    <p className="qr-step">
+                      <Trans i18nKey="sessions.pairing.step3" components={{ strong: <strong /> }} />
+                    </p>
+                    <p className="qr-step">
+                      <Trans i18nKey="sessions.pairing.step4" components={{ strong: <strong /> }} />
+                    </p>
+                  </div>
+                  <p className="qr-auto-refresh">
+                    <RefreshCw size={14} className="spin-slow" /> {t('sessions.pairing.autoRefresh')}
+                  </p>
+                </>
+              ) : (
+                <div style={{ padding: '2rem' }}>
+                  <Loader2 className="animate-spin" size={48} />
+                  <p>{t('sessions.pairing.generating')}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -443,16 +607,34 @@ export function Sessions() {
                 <span className={`status-pill ${session.status}`}>{formatStatus(session.status)}</span>
               </div>
 
-              {session.status === 'initializing' || session.status === 'connecting' || session.status === 'qr_ready' ? (
+              {isConnecting(session.status) ? (
                 <div className="qr-placeholder">
-                  <QrCode size={80} className="qr-icon" />
-                  <p>{session.status === 'qr_ready' ? t('sessions.qr.scanToConnect') : t('sessions.qr.preparing')}</p>
+                  {session.linkMethod === 'pairing' ? (
+                    <Smartphone size={80} className="qr-icon" />
+                  ) : (
+                    <QrCode size={80} className="qr-icon" />
+                  )}
+                  <p>
+                    {session.status === 'qr_ready'
+                      ? t('sessions.qr.scanToConnect')
+                      : session.status === 'pairing_code_ready'
+                        ? t('sessions.pairing.enterToConnect')
+                        : session.linkMethod === 'pairing'
+                          ? t('sessions.pairing.preparing')
+                          : t('sessions.qr.preparing')}
+                  </p>
                   <button
                     className="btn-sm"
-                    onClick={() => handleShowQR(session.id)}
-                    disabled={session.status !== 'qr_ready'}
+                    onClick={() => handleShowConnect(session.id)}
+                    disabled={
+                      session.status !== 'qr_ready' && session.status !== 'pairing_code_ready'
+                    }
                   >
-                    {session.status === 'qr_ready' ? t('sessions.qr.showQr') : t('sessions.qr.loading')}
+                    {session.status === 'qr_ready'
+                      ? t('sessions.qr.showQr')
+                      : session.status === 'pairing_code_ready'
+                        ? t('sessions.pairing.showCode')
+                        : t('sessions.qr.loading')}
                   </button>
                 </div>
               ) : (
@@ -483,7 +665,9 @@ export function Sessions() {
                     <Play size={16} />
                     {t('sessions.actions.start')}
                   </button>
-                ) : canWrite && ['ready', 'initializing', 'connecting', 'qr_ready'].includes(session.status) ? (
+                ) : canWrite && ['ready', 'initializing', 'connecting', 'qr_ready', 'pairing_code_ready'].includes(
+                    session.status,
+                  ) ? (
                   <button className="btn-action" onClick={() => handleStop(session.id)}>
                     <Square size={16} />
                     {t('sessions.actions.stop')}

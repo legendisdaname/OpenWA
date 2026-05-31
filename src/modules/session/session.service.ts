@@ -10,6 +10,7 @@ import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, In, DataSource } from 'typeorm';
 import { Session, SessionStatus } from './entities/session.entity';
 import { CreateSessionDto } from './dto';
+import { buildSessionConfig, getSessionLinkConfig } from './utils/session-link.util';
 import { EngineFactory } from '../../engine/engine.factory';
 import { IWhatsAppEngine, EngineStatus } from '../../engine/interfaces/whatsapp-engine.interface';
 import { createLogger } from '../../common/services/logger.service';
@@ -54,6 +55,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit {
       SessionStatus.READY,
       SessionStatus.INITIALIZING,
       SessionStatus.QR_READY,
+      SessionStatus.PAIRING_CODE_READY,
       SessionStatus.AUTHENTICATING,
     ];
 
@@ -100,9 +102,13 @@ export class SessionService implements OnModuleDestroy, OnModuleInit {
       throw new ConflictException(`Session with name '${dto.name}' already exists`);
     }
 
+    if (dto.linkMethod === 'pairing' && !dto.phoneNumber) {
+      throw new BadRequestException('phoneNumber is required when linkMethod is pairing');
+    }
+
     const session = this.sessionRepository.create({
       name: dto.name,
-      config: dto.config || {},
+      config: buildSessionConfig(dto.config, dto.linkMethod ?? 'qr', dto.phoneNumber),
       proxyUrl: dto.proxyUrl || null,
       proxyType: dto.proxyType || null,
       status: SessionStatus.CREATED,
@@ -224,10 +230,19 @@ export class SessionService implements OnModuleDestroy, OnModuleInit {
       proxyEnabled: !!session.proxyUrl,
     });
 
+    const linkConfig = getSessionLinkConfig(session.config as Record<string, unknown>);
     const engine = this.engineFactory.create({
       sessionId: session.name,
       proxyUrl: session.proxyUrl || undefined,
       proxyType: session.proxyType || undefined,
+      pairWithPhoneNumber:
+        linkConfig.linkMethod === 'pairing' && linkConfig.phoneNumber
+          ? {
+              phoneNumber: linkConfig.phoneNumber,
+              showNotification: true,
+              intervalMs: 180000,
+            }
+          : undefined,
     });
     this.engines.set(id, engine);
 
@@ -249,6 +264,28 @@ export class SessionService implements OnModuleDestroy, OnModuleInit {
         );
 
         void this.updateStatus(id, SessionStatus.QR_READY);
+        const qr = engine.getQRCode();
+        if (qr) {
+          this.eventsGateway.emitQRCode(id, qr);
+        }
+      },
+      onPairingCode: (code: string): void => {
+        this.logger.log('Pairing code generated', {
+          sessionId: id,
+          action: 'pairing_code_generated',
+        });
+
+        void this.hookManager.execute(
+          'session:pairing_code',
+          { sessionId: id, code },
+          {
+            sessionId: id,
+            source: 'Engine',
+          },
+        );
+
+        void this.updateStatus(id, SessionStatus.PAIRING_CODE_READY);
+        this.eventsGateway.emitPairingCode(id, code);
       },
       onReady: (phone: string, pushName: string): void => {
         this.logger.log(`Session ready: ${phone}`, {
@@ -339,6 +376,7 @@ export class SessionService implements OnModuleDestroy, OnModuleInit {
           [EngineStatus.DISCONNECTED]: SessionStatus.DISCONNECTED,
           [EngineStatus.INITIALIZING]: SessionStatus.INITIALIZING,
           [EngineStatus.QR_READY]: SessionStatus.QR_READY,
+          [EngineStatus.PAIRING_CODE_READY]: SessionStatus.PAIRING_CODE_READY,
           [EngineStatus.AUTHENTICATING]: SessionStatus.AUTHENTICATING,
           [EngineStatus.READY]: SessionStatus.READY,
           [EngineStatus.FAILED]: SessionStatus.FAILED,
@@ -439,6 +477,13 @@ export class SessionService implements OnModuleDestroy, OnModuleInit {
 
   async getQRCode(id: string): Promise<{ qrCode: string; status: SessionStatus }> {
     const session = await this.findOne(id);
+    const linkConfig = getSessionLinkConfig(session.config as Record<string, unknown>);
+    if (linkConfig.linkMethod === 'pairing') {
+      throw new BadRequestException(
+        'This session uses phone pairing. Use GET /sessions/:id/pairing-code instead.',
+      );
+    }
+
     const engine = this.engines.get(id);
 
     if (!engine) {
@@ -456,6 +501,40 @@ export class SessionService implements OnModuleDestroy, OnModuleInit {
 
     return {
       qrCode,
+      status: session.status,
+    };
+  }
+
+  async getPairingCode(
+    id: string,
+  ): Promise<{ pairingCode: string; phoneNumber: string; status: SessionStatus }> {
+    const session = await this.findOne(id);
+    const linkConfig = getSessionLinkConfig(session.config as Record<string, unknown>);
+
+    if (linkConfig.linkMethod !== 'pairing' || !linkConfig.phoneNumber) {
+      throw new BadRequestException(
+        'This session uses QR linking. Create a session with linkMethod "pairing" and phoneNumber.',
+      );
+    }
+
+    const engine = this.engines.get(id);
+
+    if (!engine) {
+      throw new BadRequestException('Session is not started. Call POST /sessions/:id/start first.');
+    }
+
+    const pairingCode = engine.getPairingCode();
+
+    if (!pairingCode) {
+      if (session.status === SessionStatus.READY) {
+        throw new BadRequestException('Session is already authenticated');
+      }
+      throw new BadRequestException('Pairing code is not ready yet. Please wait...');
+    }
+
+    return {
+      pairingCode,
+      phoneNumber: linkConfig.phoneNumber,
       status: session.status,
     };
   }

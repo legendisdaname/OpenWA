@@ -10,7 +10,17 @@ const API_BASE_URL = '/api';
 export interface Session {
   id: string;
   name: string;
-  status: 'created' | 'idle' | 'initializing' | 'connecting' | 'qr_ready' | 'ready' | 'disconnected';
+  status:
+    | 'created'
+    | 'idle'
+    | 'initializing'
+    | 'connecting'
+    | 'qr_ready'
+    | 'pairing_code_ready'
+    | 'ready'
+    | 'disconnected';
+  linkMethod?: 'qr' | 'pairing';
+  linkPhoneNumber?: string;
   phone?: string;
   pushName?: string;
   lastActive?: string;
@@ -178,15 +188,22 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 export const sessionApi = {
   list: () => request<Session[]>('/sessions'),
   get: (id: string) => request<Session>(`/sessions/${id}`),
-  create: (name: string) =>
+  create: (
+    name: string,
+    options?: { linkMethod?: 'qr' | 'pairing'; phoneNumber?: string },
+  ) =>
     request<Session>('/sessions', {
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, ...options }),
     }),
   delete: (id: string) => request<void>(`/sessions/${id}`, { method: 'DELETE' }),
   start: (id: string) => request<Session>(`/sessions/${id}/start`, { method: 'POST' }),
   stop: (id: string) => request<Session>(`/sessions/${id}/stop`, { method: 'POST' }),
   getQR: (id: string) => request<{ qrCode: string; status: string }>(`/sessions/${id}/qr`),
+  getPairingCode: (id: string) =>
+    request<{ pairingCode: string; phoneNumber: string; status: string }>(
+      `/sessions/${id}/pairing-code`,
+    ),
   getStats: () => request<SessionStats>('/sessions/stats/overview'),
   getGroups: (id: string) => request<{ id: string; name: string }[]>(`/sessions/${id}/groups`),
 };

@@ -28,6 +28,15 @@ export class SessionResponseDto {
 
   @ApiProperty({ example: '2025-02-02T10:00:00Z' })
   updatedAt: Date;
+
+  @ApiPropertyOptional({ enum: ['qr', 'pairing'], example: 'qr' })
+  linkMethod?: 'qr' | 'pairing';
+
+  @ApiPropertyOptional({
+    description: 'Phone number for pairing-code linking (digits only)',
+    example: '628123456789',
+  })
+  linkPhoneNumber?: string;
 }
 
 export class QRCodeResponseDto {
@@ -38,5 +47,22 @@ export class QRCodeResponseDto {
   qrCode: string;
 
   @ApiProperty({ enum: SessionStatus, example: SessionStatus.QR_READY })
+  status: SessionStatus;
+}
+
+export class PairingCodeResponseDto {
+  @ApiProperty({
+    description: '8-character pairing code to enter on your phone',
+    example: 'ABCD-EFGH',
+  })
+  pairingCode: string;
+
+  @ApiProperty({
+    description: 'Phone number used for pairing (digits only)',
+    example: '628123456789',
+  })
+  phoneNumber: string;
+
+  @ApiProperty({ enum: SessionStatus, example: SessionStatus.PAIRING_CODE_READY })
   status: SessionStatus;
 }

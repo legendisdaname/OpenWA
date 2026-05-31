@@ -111,6 +111,7 @@
     "initializing": "מאתחל...",
     "connecting": "מתחבר...",
     "qr_ready": "סריקת QR",
+    "pairing_code_ready": "הזנת קוד",
     "ready": "מחובר",
     "disconnected": "מנותק"
   },
@@ -140,7 +141,13 @@
       "successTitle": "ה-Session נוצר",
       "successDesc": "Session \"{{name}}\" נוצר בהצלחה",
       "errorTitle": "היצירה נכשלה",
-      "errorDefault": "יצירת ה-Session נכשלה"
+      "errorDefault": "יצירת ה-Session נכשלה",
+      "linkMethod": "שיטת חיבור",
+      "linkQr": "קוד QR (סריקה בטלפון)",
+      "linkPairing": "קוד pairing (קישור באמצעות מספר)",
+      "phoneLabel": "מספר WhatsApp שלך",
+      "phonePlaceholder": "לדוגמה 972501234567",
+      "phoneHint": "פורמט בינלאומי, ספרות בלבד (ללא + או רווחים)."
     },
     "delete": {
       "title": "אישור מחיקה",
@@ -164,6 +171,21 @@
       "showQr": "הצגת QR",
       "loading": "טוען...",
       "scanToConnect": "יש לסרוק את ה-QR כדי להתחבר"
+    },
+    "pairing": {
+      "title": "קישור באמצעות מספר טלפון",
+      "forPhone": "עבור המספר: {{phone}}",
+      "step1": "<strong>1.</strong> יש לפתוח את WhatsApp בטלפון",
+      "step2": "<strong>2.</strong> יש להקיש על <strong>תפריט</strong> → <strong>מכשירים מקושרים</strong>",
+      "step3": "<strong>3.</strong> יש להקיש על <strong>קישור באמצעות מספר טלפון</strong>",
+      "step4": "<strong>4.</strong> יש להזין את הקוד הבא בטלפון:",
+      "autoRefresh": "הקוד מתעדכן אוטומטית כל 3 דקות",
+      "generating": "יוצר קוד pairing...",
+      "unavailable": "קוד ה-pairing אינו זמין כעת. יש לנסות שוב בעוד רגע.",
+      "preparing": "מכין קוד pairing...",
+      "showCode": "הצגת קוד",
+      "loading": "טוען...",
+      "enterToConnect": "יש להזין את קוד ה-pairing בטלפון"
     },
     "details": {
       "title": "פרטי Session",

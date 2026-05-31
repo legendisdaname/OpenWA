@@ -1,6 +1,9 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IWhatsAppEngine } from './interfaces/whatsapp-engine.interface';
+import {
+  IWhatsAppEngine,
+  PairWithPhoneNumberOptions,
+} from './interfaces/whatsapp-engine.interface';
 import { WhatsAppWebJsAdapter } from './adapters/whatsapp-web-js.adapter';
 import { PluginLoaderService, PluginType, IEnginePlugin, PluginManifest } from '../core/plugins';
 import { WhatsAppWebJsPlugin } from '../plugins/engines/whatsapp-web-js';
@@ -10,6 +13,7 @@ export interface EngineCreateOptions {
   sessionId: string;
   proxyUrl?: string;
   proxyType?: 'http' | 'https' | 'socks4' | 'socks5';
+  pairWithPhoneNumber?: PairWithPhoneNumberOptions;
 }
 
 @Injectable()
@@ -69,6 +73,7 @@ export class EngineFactory implements OnModuleInit {
         sessionId: options.sessionId,
         proxyUrl: options.proxyUrl,
         proxyType: options.proxyType,
+        pairWithPhoneNumber: options.pairWithPhoneNumber,
       }) as IWhatsAppEngine;
     }
 
@@ -106,6 +111,7 @@ export class EngineFactory implements OnModuleInit {
             type: options.proxyType ?? 'http',
           }
         : undefined,
+      pairWithPhoneNumber: options.pairWithPhoneNumber,
     });
   }
 

@@ -647,6 +647,52 @@
   color: #ca8a04;
 }
 
+.link-method-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.link-method-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.link-method-option:has(input:checked) {
+  border-color: var(--primary, #2563eb);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.pairing-code-display {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  font-family: ui-monospace, monospace;
+  padding: 1rem 1.5rem;
+  margin: 1rem 0;
+  background: #f1f5f9;
+  border-radius: 12px;
+  color: #0f172a;
+}
+
+.pairing-phone-label {
+  color: #64748b;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.status-pill.pairing_code_ready {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .status-pill.qr_ready {
   background: rgba(59, 130, 246, 0.1);
   color: #2563eb;

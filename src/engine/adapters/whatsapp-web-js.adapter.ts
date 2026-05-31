@@ -6,6 +6,7 @@ import {
   IWhatsAppEngine,
   EngineStatus,
   EngineEventCallbacks,
+  PairWithPhoneNumberOptions,
   MessageResult,
   MediaInput,
   IncomingMessage,
@@ -48,12 +49,14 @@ export interface WhatsAppWebJsConfig {
     url: string;
     type: 'http' | 'https' | 'socks4' | 'socks5';
   };
+  pairWithPhoneNumber?: PairWithPhoneNumberOptions;
 }
 
 export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngine {
   private client: Client | null = null;
   private status: EngineStatus = EngineStatus.DISCONNECTED;
   private qrCode: string | null = null;
+  private pairingCode: string | null = null;
   private phoneNumber: string | null = null;
   private pushName: string | null = null;
   private callbacks: EngineEventCallbacks = {};
@@ -97,6 +100,15 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
           headless: this.config.puppeteer?.headless ?? true,
           args: puppeteerArgs,
         },
+        ...(this.config.pairWithPhoneNumber
+          ? {
+              pairWithPhoneNumber: {
+                phoneNumber: this.config.pairWithPhoneNumber.phoneNumber,
+                showNotification: this.config.pairWithPhoneNumber.showNotification ?? true,
+                intervalMs: this.config.pairWithPhoneNumber.intervalMs ?? 180000,
+              },
+            }
+          : {}),
       });
 
       this.setupEventHandlers();
@@ -114,6 +126,7 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
     this.client.on('qr', async (qr: string) => {
       try {
         this.qrCode = await qrcode.toDataURL(qr);
+        this.pairingCode = null;
         this.setStatus(EngineStatus.QR_READY);
         this.callbacks.onQRCode?.(this.qrCode);
       } catch (error) {
@@ -121,9 +134,17 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
       }
     });
 
+    this.client.on('code', (code: string) => {
+      this.pairingCode = code;
+      this.qrCode = null;
+      this.setStatus(EngineStatus.PAIRING_CODE_READY);
+      this.callbacks.onPairingCode?.(code);
+    });
+
     this.client.on('authenticated', () => {
       this.setStatus(EngineStatus.AUTHENTICATING);
       this.qrCode = null;
+      this.pairingCode = null;
     });
 
     this.client.on('ready', () => {
@@ -259,6 +280,10 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
 
   getQRCode(): string | null {
     return this.qrCode;
+  }
+
+  getPairingCode(): string | null {
+    return this.pairingCode;
   }
 
   getPhoneNumber(): string | null {

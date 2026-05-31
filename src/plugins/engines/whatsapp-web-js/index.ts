@@ -44,6 +44,9 @@ export class WhatsAppWebJsPlugin implements IEnginePlugin {
 
     const proxyUrl = config.proxyUrl as string | undefined;
     const proxyType = config.proxyType as 'http' | 'https' | 'socks4' | 'socks5' | undefined;
+    const pairWithPhoneNumber = config.pairWithPhoneNumber as
+      | { phoneNumber: string; showNotification?: boolean; intervalMs?: number }
+      | undefined;
 
     return new WhatsAppWebJsAdapter({
       sessionId,
@@ -58,6 +61,7 @@ export class WhatsAppWebJsPlugin implements IEnginePlugin {
             type: proxyType ?? 'http',
           }
         : undefined,
+      pairWithPhoneNumber,
     });
   }
 

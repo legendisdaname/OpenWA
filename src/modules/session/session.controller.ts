@@ -1,7 +1,13 @@
 import { Controller, Get, Post, Delete, Param, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { SessionService } from './session.service';
-import { CreateSessionDto, SessionResponseDto, QRCodeResponseDto } from './dto';
+import {
+  CreateSessionDto,
+  SessionResponseDto,
+  QRCodeResponseDto,
+  PairingCodeResponseDto,
+} from './dto';
+import { getSessionLinkConfig } from './utils/session-link.util';
 import { Session } from './entities/session.entity';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../audit/entities/audit-log.entity';
@@ -18,6 +24,7 @@ export class SessionController {
 
   // Transform entity to DTO with lastActive field name
   private transformSession(session: Session): SessionResponseDto {
+    const linkConfig = getSessionLinkConfig(session.config as Record<string, unknown>);
     return {
       id: session.id,
       name: session.name,
@@ -28,6 +35,8 @@ export class SessionController {
       lastActive: session.lastActiveAt,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
+      linkMethod: linkConfig.linkMethod,
+      linkPhoneNumber: linkConfig.phoneNumber,
     };
   }
 
@@ -151,6 +160,23 @@ export class SessionController {
       sessionId: id,
     });
     return qrCode;
+  }
+
+  @Get(':id/pairing-code')
+  @ApiOperation({ summary: 'Get pairing code for phone-number linking' })
+  @ApiParam({ name: 'id', description: 'Session ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pairing code for WhatsApp "Link with phone number"',
+    type: PairingCodeResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Pairing code not ready, wrong link method, or session already authenticated',
+  })
+  @ApiResponse({ status: 404, description: 'Session not found' })
+  async getPairingCode(@Param('id') id: string): Promise<PairingCodeResponseDto> {
+    return this.sessionService.getPairingCode(id);
   }
 
   @Get(':id/groups')

@@ -4,6 +4,7 @@ export enum EngineStatus {
   DISCONNECTED = 'disconnected',
   INITIALIZING = 'initializing',
   QR_READY = 'qr_ready',
+  PAIRING_CODE_READY = 'pairing_code_ready',
   AUTHENTICATING = 'authenticating',
   READY = 'ready',
   FAILED = 'failed',
@@ -194,8 +195,15 @@ export interface PaginatedProducts {
   };
 }
 
+export interface PairWithPhoneNumberOptions {
+  phoneNumber: string;
+  showNotification?: boolean;
+  intervalMs?: number;
+}
+
 export interface EngineEventCallbacks {
   onQRCode?: (qr: string) => void;
+  onPairingCode?: (code: string) => void;
   onReady?: (phone: string, pushName: string) => void;
   onMessage?: (message: IncomingMessage) => void;
   onMessageAck?: (messageId: string, ack: number) => void;
@@ -213,6 +221,7 @@ export interface IWhatsAppEngine {
   // Status
   getStatus(): EngineStatus;
   getQRCode(): string | null;
+  getPairingCode(): string | null;
   getPhoneNumber(): string | null;
   getPushName(): string | null;
 
